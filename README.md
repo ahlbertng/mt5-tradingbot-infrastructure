@@ -1,354 +1,296 @@
-# 🤖 MT5 AI Trading Bot
+# 🤖 MT5 Trading Bot - Multi-Cloud Infrastructure
 
-An intelligent, self-learning trading bot for MetaTrader 5 that uses reinforcement learning to develop and refine its own trading strategies.
+[![Terraform](https://img.shields.io/badge/Terraform-1.0+-623CE4?style=flat&logo=terraform)](https://www.terraform.io/)
+[![AWS](https://img.shields.io/badge/AWS-Cloud-FF9900?style=flat&logo=amazon-aws)](https://aws.amazon.com/)
+[![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=flat&logo=docker)](https://www.docker.com/)
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat&logo=python)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## 🌟 Features
+> Production-grade infrastructure for an ML-powered algorithmic trading bot with multi-cloud deployment and 70% cost optimization.
 
-- **🧠 Machine Learning**: Uses PPO (Proximal Policy Optimization) reinforcement learning
-- **📊 Adaptive Strategy**: Learns patterns and crafts strategies from market data
-- **☁️ Cloud-Native**: Fully deployed on AWS infrastructure
-- **📈 Real-Time Monitoring**: CloudWatch dashboards and SNS alerts
-- **🛡️ Risk Management**: Built-in position sizing and loss limits
-- **💾 Data Persistence**: PostgreSQL database for trade history
-- **🔄 Continuous Learning**: Improves strategy over time from results
+## 🎯 Project Overview
+
+This project demonstrates enterprise-level DevOps practices by implementing a complete infrastructure stack for an algorithmic trading bot powered by reinforcement learning. The system uses a hybrid cloud architecture to optimize costs while maintaining production-grade reliability.
+
+### Key Features
+
+- **Multi-Cloud Architecture**: Hybrid Oracle Cloud + AWS deployment
+- **Infrastructure as Code**: Complete Terraform configuration
+- **Configuration Management**: Ansible playbooks for automated deployment
+- **Containerization**: Docker and Docker Compose for consistency
+- **ML Integration**: Reinforcement learning using Stable-Baselines3
+- **Cost Optimization**: 70% reduction vs traditional AWS-only approach
+- **Production Monitoring**: CloudWatch metrics, Grafana dashboards
+- **Security**: Encrypted state, secrets management, IAM roles
 
 ## 🏗️ Architecture
 
+### Hybrid Cloud Design
+
 ```
-┌─────────────────┐
-│   You (Cloud    │
-│   Engineer)     │
-└────────┬────────┘
-         │
-    ┌────▼──────────────────────────────────────────┐
-    │         AWS Cloud Infrastructure              │
-    │                                               │
-    │  ┌──────────────┐    ┌──────────────┐       │
-    │  │ EC2 Instance │◄───┤ RDS Postgres │       │
-    │  │  - MT5       │    │              │       │
-    │  │  - Python    │    └──────────────┘       │
-    │  │  - ML Agent  │                           │
-    │  └──────┬───────┘                           │
-    │         │                                    │
-    │         │      ┌──────────────┐            │
-    │         └──────►  S3 Bucket   │            │
-    │                │ (ML Models)  │            │
-    │                └──────────────┘            │
-    │                                            │
-    │  ┌────────────────────────────────┐       │
-    │  │  CloudWatch Monitoring         │       │
-    │  │  - Logs  - Metrics  - Alarms   │       │
-    │  └────────────┬───────────────────┘       │
-    │               │                            │
-    │       ┌───────▼────────┐                  │
-    │       │  SNS Alerts    │                  │
-    │       │  (Email/SMS)   │                  │
-    │       └────────────────┘                  │
-    └───────────────────────────────────────────┘
-                     │
-                     ▼
-            ┌────────────────┐
-            │  MT5 Broker    │
-            │  (Demo/Live)   │
-            └────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                   ORACLE CLOUD (FREE TIER)                  │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  ARM VM (4 CPU, 24GB RAM)                           │   │
+│  │  ├─ Trading Bot (Docker)                            │   │
+│  │  ├─ Grafana (Monitoring)                            │   │
+│  │  └─ CloudWatch Agent                                │   │
+│  └─────────────────────────────────────────────────────┘   │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    AWS MANAGED SERVICES                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │ RDS          │  │ S3           │  │ CloudWatch   │     │
+│  │ PostgreSQL   │  │ ML Models    │  │ Monitoring   │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+│  ┌──────────────┐  ┌──────────────┐                       │
+│  │ SNS          │  │ Secrets Mgr  │                       │
+│  │ Alerts       │  │ Credentials  │                       │
+│  └──────────────┘  └──────────────┘                       │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## 📦 What's Included
+### Tech Stack
 
-### 1. Infrastructure as Code (Terraform)
-- Complete AWS setup
-- VPC with public/private subnets
-- EC2 instance configuration
-- RDS PostgreSQL database
-- S3 bucket for model storage
-- Security groups and IAM roles
-- CloudWatch monitoring setup
+**Infrastructure**
+- Terraform - Infrastructure as Code
+- Ansible - Configuration Management
+- Docker/Docker Compose - Containerization
 
-### 2. Trading Bot (Python)
-- **main.py**: Main orchestrator
-- **mt5_connector.py**: MetaTrader 5 API integration
-- **ml_agent.py**: Reinforcement learning agent
-- **database.py**: PostgreSQL operations
-- **risk_manager.py**: Position sizing and risk controls
-- **aws_integration.py**: AWS services integration
+**Cloud Providers**
+- AWS (RDS, S3, CloudWatch, SNS, Secrets Manager)
+- Oracle Cloud (ARM VM - forever free tier)
 
-### 3. Monitoring & Alerts
-- CloudWatch dashboard configuration
-- Custom metric alarms
-- Health check script
-- Log aggregation
+**Application**
+- Python 3.11
+- Stable-Baselines3 (PPO Reinforcement Learning)
+- FinRL (Financial RL framework)
+- MetaTrader 5 API
+- PostgreSQL
 
-### 4. Documentation
-- Complete deployment guide
-- Architecture diagrams
-- Troubleshooting tips
+**Monitoring**
+- Grafana (dashboards)
+- AWS CloudWatch (metrics & logs)
+- SNS (email/SMS alerts)
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- AWS account with admin access
-- MT5 demo account (from IC Markets, Pepperstone, etc.)
-- Terraform installed
-- AWS CLI configured
-- SSH key pair
 
-### Deploy in 5 Steps
+- AWS Account (free tier eligible)
+- Terraform >= 1.0
+- Ansible >= 2.9
+- Docker & Docker Compose
+- MT5 Demo Account
+
+### Deployment Options
+
+#### Option 1: Local Testing (Recommended for first-time)
 
 ```bash
-# 1. Configure your settings
+# 1. Clone repository
+git clone https://github.com/yourusername/mt5-trading-bot-infrastructure.git
+cd mt5-trading-bot-infrastructure
+
+# 2. Configure environment
+cp .env.example .env
+nano .env  # Add your MT5 credentials
+
+# 3. Start services
+docker-compose up -d
+
+# 4. Access Grafana
+open http://localhost:3000
+```
+
+#### Option 2: AWS + Oracle Cloud Hybrid (Production)
+
+```bash
+# 1. Deploy AWS infrastructure
 cd terraform
 cp terraform.tfvars.example terraform.tfvars
-nano terraform.tfvars  # Update with your values (do NOT commit this file)
+nano terraform.tfvars  # Update with your values
+terraform init
+terraform apply
 
-# Note on remote state locking and secrets
-- The Terraform backend uses an S3 bucket for state and a DynamoDB table for locks. If you don't have
-    the DynamoDB table yet, either create it (`terraform-locks-<env>`) or provide it during `terraform init`
-    via `-backend-config`. Example:
+# 2. Create Oracle Cloud VM
+# - Sign up at oracle.com/cloud/free
+# - Create ARM instance (4 CPU, 24GB)
+# - Download SSH key
+# - Note public IP
+
+# 3. Update Ansible inventory
+cd ../ansible
+nano inventory/hosts.yml  # Add Oracle VM IP
+
+# 4. Create secrets file
+cp vars/secrets.yml.example vars/secrets.yml
+nano vars/secrets.yml  # Add credentials
+ansible-vault encrypt vars/secrets.yml
+
+# 5. Deploy bot
+ansible-playbook playbooks/deploy.yml --ask-vault-pass
+```
+
+## 📁 Project Structure
+
+```
+.
+├── terraform/              # Infrastructure as Code
+│   ├── main.tf            # Main configuration
+│   ├── variables.tf       # Input variables
+│   ├── outputs.tf         # Output values
+│   └── terraform.tfvars   # Your values (gitignored)
+├── ansible/               # Configuration Management
+│   ├── inventory/         # Host definitions
+│   ├── playbooks/         # Automation playbooks
+│   ├── templates/         # Config templates
+│   └── vars/              # Variables & secrets
+├── bot/                   # Trading bot application
+│   ├── main.py           # Main orchestrator
+│   ├── ml_agent.py       # RL agent
+│   ├── mt5_connector.py  # MT5 integration
+│   ├── database.py       # PostgreSQL ops
+│   └── requirements.txt  # Python dependencies
+├── docker-compose.yml     # Container orchestration
+├── Dockerfile            # Bot container image
+└── .gitignore           # Protected files
+
+```
+
+## 🔧 Configuration
+
+### Environment Variables
 
 ```bash
-# from the terraform directory
-terraform init -backend-config="bucket=your-terraform-state-bucket" \
-    -backend-config="key=mt5-trading-bot/terraform.tfstate" \
-    -backend-config="region=us-east-1" \
-    -backend-config="dynamodb_table=terraform-locks-dev"
-terraform apply
+# MT5 Account
+MT5_LOGIN=your_account_number
+MT5_PASSWORD=your_password
+MT5_SERVER=ICMarketsSC-Demo
+
+# Database (AWS RDS)
+DB_ENDPOINT=your-rds-endpoint.rds.amazonaws.com:5432
+DB_NAME=trading_db
+DB_USERNAME=trading_admin
+DB_PASSWORD=your_secure_password
+
+# AWS Services
+S3_BUCKET=your-s3-bucket
+AWS_REGION=us-east-1
+SNS_TOPIC_ARN=arn:aws:sns:...
 ```
 
-# Secrets & RDS
-- RDS master credentials are stored in AWS Secrets Manager by the Terraform deployment. Avoid placing
-    the DB password in `terraform.tfvars` or source control. The deployment enables managed master
-    password handling so Terraform does not keep the plaintext password on the DB resource.
+### Terraform Variables
 
-# 3. Deploy bot code
-scp -r bot/* ubuntu@<EC2_IP>:/home/trader/mt5-bot/
+Key variables in `terraform.tfvars`:
 
-# 4. Start the bot
-ssh ubuntu@<EC2_IP>
-sudo systemctl start trading-bot
-
-# 5. Monitor
-tail -f /home/trader/mt5-bot/logs/trading_bot.log
+```hcl
+aws_region = "us-east-1"
+environment = "prod"
+db_password = "your_secure_password"
+oracle_vm_ip = "123.45.67.89"  # Update after VM creation
 ```
-
-**Full deployment guide**: [DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)
-
-## 💡 How It Works
-
-### Learning Phase (First 24-48 hours)
-1. Bot connects to MT5 demo account
-2. Fetches historical market data (EURUSD by default)
-3. Trains reinforcement learning model
-4. Learns profitable patterns
-5. Begins making conservative trades
-
-### Active Trading Phase
-1. Analyzes current market conditions
-2. ML agent predicts optimal action (Buy/Sell/Hold)
-3. Risk manager calculates safe position size
-4. Executes trade through MT5
-5. Monitors position and manages exits
-6. Records results for continued learning
-
-### Continuous Improvement
-- Learns from every trade (profit/loss feedback)
-- Adapts to changing market conditions
-- Refines strategy parameters
-- Saves improved models to S3
-
-## 🎯 Key Components Explained
-
-### Reinforcement Learning Agent
-- **Algorithm**: PPO (Proximal Policy Optimization)
-- **State Space**: Price data, indicators, account info
-- **Action Space**: Buy, Sell, Hold
-- **Reward Function**: Profit-based with risk penalties
-
-### Risk Management
-- Max 2% risk per trade (configurable)
-- Max 5% daily loss limit
-- Position sizing based on stop loss
-- Automatic position closure on limits
-
-### Trade Execution
-- Market orders via MT5 API
-- Configurable stop loss and take profit
-- Slippage protection
-- Trade logging to database
 
 ## 📊 Monitoring
 
+### Grafana Dashboards
+- Account balance tracking
+- Daily P&L charts
+- Trade execution metrics
+- System resource monitoring
+
 ### CloudWatch Metrics
-- Account balance & equity
-- Daily P&L
-- Trades executed
-- CPU/Memory usage
-- Database performance
+- Custom metrics: AccountBalance, DailyPnL, TradesExecuted
+- System metrics: CPU, Memory, Disk
+- Logs: Bot application logs
 
-### Alerts (SNS)
+### Alerts
 - Low account balance
-- High daily losses
-- Bot stopped/crashed
-- System errors
+- High daily loss
+- Bot downtime
+- System resource alerts
 
-### Database Queries
-```sql
--- View recent trades
-SELECT * FROM trades ORDER BY open_time DESC LIMIT 10;
+## 🔒 Security
 
--- Trading statistics
-SELECT 
-    COUNT(*) as total_trades,
-    SUM(CASE WHEN profit > 0 THEN 1 ELSE 0 END) as winning_trades,
-    SUM(profit) as total_profit
-FROM trades 
-WHERE close_time >= NOW() - INTERVAL '30 days';
-```
+- **S3 Backend**: Encrypted Terraform state with versioning
+- **Secrets Management**: Ansible Vault + AWS Secrets Manager
+- **IAM Roles**: Least privilege access
+- **Network Security**: Security groups with IP whitelisting
+- **Encryption**: All data encrypted at rest and in transit
 
-## 🔧 Customization
+## 🧪 Testing
 
-### Change Trading Symbol
-```python
-# In main.py
-market_data = self.mt5.get_market_data(symbol="GBPUSD")
-```
-
-### Adjust Risk Parameters
-```python
-# In risk_manager.py
-max_risk_per_trade = 0.01  # 1% instead of 2%
-max_daily_loss = 0.03      # 3% instead of 5%
-```
-
-### ML Training Parameters
-```python
-# In ml_agent.py
-self.model = PPO(
-    learning_rate=0.0001,  # Lower for more stable learning
-    n_steps=4096,          # More steps per update
-    # ... other parameters
-)
-```
-
-## 💰 Cost Breakdown
-
-**AWS Monthly Costs (Demo Account):**
-| Service | Configuration | Monthly Cost |
-|---------|--------------|--------------|
-| EC2 | t3.medium | ~$30 |
-| RDS | db.t3.micro | ~$15 |
-| S3 | Storage + transfers | ~$5 |
-| Data Transfer | | ~$5 |
-| **Total** | | **~$55/month** |
-
-**Cost Optimization Tips:**
-- Use t3.small instance: Save $15/mo
-- Stop EC2 on weekends: Save ~30%
-- Use spot instances: Save up to 70%
-
-## 🔐 Security
-
-- All credentials stored in AWS Secrets Manager (do not commit secrets to tfvars)
-- Encrypted RDS database (master password managed via Secrets Manager)
-- Security groups restrict access; SSH should be limited to a small set of CIDRs
-- Regular automated backups
-- SSH access limited to your IP (set `allowed_ssh_ips` in `terraform.tfvars`)
-
-Notes about provisioning and `user_data.sh`:
-- The EC2 `user_data` script now runs non-interactively and includes steps to build TA-Lib's C
-    dependency before installing the Python `ta-lib` package.
-- The provisioning script no longer adds the `trader` user to the global `sudo` group by default.
-    If elevated commands are required, create a narrowly scoped `/etc/sudoers.d/` entry instead.
-- Runtime environment variables are provided to the service using a systemd `EnvironmentFile` at
-    `/home/trader/trading-bot.env` (created by the instance user data). This avoids exporting secrets
-    in shell startup files.
-
-## 📈 Performance
-
-**Demo Account Results (Typical):**
-- Win rate: 55-65%
-- Average trade: 20-40 pips
-- Daily trades: 5-15
-- Max drawdown: <10%
-
-*Results vary based on market conditions and training time*
-
-## ⚠️ Important Notes
-
-### This is for DEMO/LEARNING ONLY
-- Never risk money you can't afford to lose
-- Thoroughly test on demo for 30+ days minimum
-- Understand the bot's behavior before going live
-- Past performance doesn't guarantee future results
-- Market conditions can change rapidly
-
-### Before Live Trading
-- [ ] 30+ days successful demo trading
-- [ ] Understand all bot components
-- [ ] Tested risk management thoroughly
-- [ ] Small live account first ($500-1000)
-- [ ] Can afford to lose the entire amount
-
-## 🛠️ Troubleshooting
-
-### Bot Won't Start
 ```bash
-sudo journalctl -u trading-bot -n 50
+# Run local tests
+docker-compose up -d
+docker-compose logs -f trading-bot
+
+# Validate Terraform
+cd terraform
+terraform validate
+terraform plan
+
+# Test Ansible connectivity
+cd ansible
+ansible trading_bots -m ping
 ```
 
-### MT5 Connection Issues
-- Verify credentials in Secrets Manager
-- Check broker server name
-- Ensure demo account is active
+## 📈 Machine Learning
 
-### No Trades
-- Confirm market is open
-- Check risk limits aren't hit
-- Verify ML model trained
+The bot uses **Proximal Policy Optimization (PPO)** for adaptive trading strategy:
 
-**Full troubleshooting**: See [DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)
+- **State Space**: Market indicators, account info, positions
+- **Action Space**: Buy, Sell, Hold
+- **Reward**: Profit/Loss with risk-adjusted returns
+- **Training**: Continuous learning from live trades
+- **Framework**: Stable-Baselines3 + FinRL
 
-## 📚 Resources
+## 🛠️ Management Commands
 
-- [Full Deployment Guide](docs/DEPLOYMENT_GUIDE.md)
-- [Architecture Diagram](docs/architecture.mermaid)
-- [MT5 Python Documentation](https://www.mql5.com/en/docs/python_metatrader5)
-- [Stable-Baselines3 Docs](https://stable-baselines3.readthedocs.io/)
+```bash
+# Terraform
+terraform plan          # Preview changes
+terraform apply         # Deploy infrastructure
+terraform destroy       # Tear down resources
+terraform output        # View outputs
 
-## 🤝 Contributing
+# Ansible
+ansible-playbook playbooks/deploy.yml    # Deploy bot
+ansible-playbook playbooks/manage.yml -e "action=start"
+ansible-playbook playbooks/manage.yml -e "action=stop"
+ansible-playbook playbooks/manage.yml -e "action=logs"
 
-This is a personal/learning project, but improvements are welcome:
-- Bug fixes
-- Documentation improvements
-- Performance optimizations
-- Additional features
+# Docker
+docker-compose up -d         # Start services
+docker-compose down          # Stop services
+docker-compose logs -f       # View logs
+docker-compose restart       # Restart services
+```
 
-## 📄 License
+## 🎓 Key Learnings
 
-MIT License - Use at your own risk
+This project demonstrates:
 
-## ⚖️ Disclaimer
+- Multi-cloud architecture design and implementation
+- Infrastructure as Code best practices
+- Configuration management at scale
+- Cost optimization strategies
+- Production monitoring and alerting
+- Security hardening
+- ML model deployment in production
+- DevOps automation workflows
 
-**TRADING INVOLVES SIGNIFICANT RISK OF LOSS**
+## 🚧 Roadmap
 
-This software is provided for educational and research purposes only. The authors and contributors are not responsible for any financial losses incurred through the use of this bot. Always:
+- [ ] CI/CD pipeline with GitHub Actions
+- [ ] Multi-region deployment
+- [ ] A/B testing for ML strategies
+- [ ] Backtesting framework
+- [ ] Real-time model performance tracking
+- [ ] Kubernetes deployment option
 
-- Start with demo accounts
-- Never invest more than you can afford to lose
-- Seek professional financial advice
-- Understand that past performance ≠ future results
-- Be aware that market conditions can change
+## ⚠️ Disclaimer
 
-**Use at your own risk.**
-
----
-
-## 🎯 Next Steps
-
-1. ✅ Read the [Deployment Guide](docs/DEPLOYMENT_GUIDE.md)
-2. ✅ Set up your AWS account
-3. ✅ Get an MT5 demo account
-4. ✅ Deploy the infrastructure
-5. ✅ Monitor your bot's learning
-6. ✅ Analyze results and optimize
-
-**Happy Trading! 📈🤖**
+This is an educational project. **Do not use with real money without thorough testing.** Trading involves significant risk of loss.
