@@ -44,7 +44,7 @@ class RiskManager:
             open_positions = account_info.get('open_positions')
             if open_positions is not None:
                 try:
-                    if int(open_positions) >= int(self.max_positions):
+                    if int(open_positions or 0) >= int(self.max_positions or 0):
                         logger.warning(f"Max positions reached: {open_positions} >= {self.max_positions}")
                         return False
                 except Exception:

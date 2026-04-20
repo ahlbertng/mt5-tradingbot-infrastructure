@@ -18,7 +18,7 @@ from bot.risk_manager import RiskManager
 from bot.aws_integration import AWSIntegration
 
 # Configure logging with configurable path
-LOG_PATH = os.getenv('LOG_PATH', '/home/trader/mt5-bot/logs/trading_bot.log')
+LOG_PATH = os.path.join(os.environ.get("LOG_PATH", "/app/logs"), "trading_bot.log")
 log_dir = os.path.dirname(LOG_PATH)
 if log_dir and not os.path.exists(log_dir):
     try:
@@ -159,6 +159,7 @@ class TradingBot:
                     self.current_trading_day = today
                     self.trades_today = 0
                     self.daily_start_equity = account_info.get('equity')
+                    self.risk_manager.reset_daily_metrics()
                     logger.info(f"New trading day {self.current_trading_day}, reset trades_today and daily_start_equity={self.daily_start_equity}")
 
                 # Initialize daily start equity if not set
@@ -220,6 +221,10 @@ class TradingBot:
     def execute_trade(self, signal: Dict[str, Any], account_info: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a trade based on signal"""
         try:
+            if account_info is None:
+                logger.error("Cannot execute trade: account_info is None")
+                return None
+
             logger.info(f"Executing trade: {signal}")
             # Calculate position size based on risk management using passed account_info
             position_size = self.risk_manager.calculate_position_size(
@@ -250,17 +255,21 @@ class TradingBot:
     def update_metrics(self, account_info: Dict[str, Any]):
         """Update CloudWatch metrics"""
         try:
+            if account_info is None:
+                logger.error("Cannot update metrics: account_info is None")
+                return
+
             self.aws.publish_metric('AccountBalance', account_info['balance'])
             self.aws.publish_metric('AccountEquity', account_info['equity'])
             self.aws.publish_metric('TradesExecuted', self.trades_today)
-            
+
             # Calculate daily P&L using starting equity for the trading day
             if self.daily_start_equity is None:
                 self.daily_start_equity = account_info.get('equity')
 
             daily_pnl = account_info.get('equity', 0) - (self.daily_start_equity or 0)
             self.aws.publish_metric('DailyPnL', daily_pnl)
-            
+
         except Exception as e:
             logger.error(f"Error updating metrics: {e}")
 

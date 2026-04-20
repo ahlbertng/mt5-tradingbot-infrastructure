@@ -5,6 +5,7 @@ MT5 Connector - Handles all MetaTrader 5 platform interactions
 import MetaTrader5 as mt5
 import pandas as pd
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 
@@ -101,13 +102,17 @@ class MT5Connector:
                 logger.error("Failed to get account info")
                 return None
             
+            positions = mt5.positions_get()
+            open_positions = len(positions) if positions is not None else 0
+
             return {
                 'balance': account.balance,
                 'equity': account.equity,
                 'profit': account.profit,
                 'margin': account.margin,
                 'margin_free': account.margin_free,
-                'margin_level': account.margin_level if account.margin > 0 else 0
+                'margin_level': account.margin_level if account.margin > 0 else 0,
+                'open_positions': open_positions,
             }
             
         except Exception as e:
@@ -196,9 +201,9 @@ class MT5Connector:
             }
             
             # Add stop loss and take profit if provided
-            if stop_loss:
+            if stop_loss is not None:
                 request["sl"] = stop_loss
-            if take_profit:
+            if take_profit is not None:
                 request["tp"] = take_profit
             
             # Send order

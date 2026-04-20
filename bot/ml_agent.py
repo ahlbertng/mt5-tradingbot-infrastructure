@@ -189,7 +189,7 @@ class TradingAgent:
         self.env = None
         self.is_trained = False
         
-        self.model_path = "/home/trader/mt5-bot/models/trading_model.zip"
+        self.model_path = os.path.join(os.environ.get("MODEL_PATH", "/app/models"), "trading_model.zip")
         
     def initialize(self):
         """Initialize or load the model"""

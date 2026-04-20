@@ -1,24 +1,26 @@
 terraform {
   required_version = ">= 1.0"
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
   }
-  
+
   backend "s3" {
     # Update these values with your own
-    bucket = "ahlbert-tradingbot-terraform-state"
-    key    = "mt5-trading-bot/terraform.tfstate"
-    region = "us-east-1"
+    bucket         = "ahlbert-tradingbot-terraform-state"
+    key            = "mt5-trading-bot/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "terraform-locks-prod"
+    encrypt        = true
   }
 }
 
 provider "aws" {
   region = var.aws_region
-  
+
   default_tags {
     tags = {
       Project     = "MT5-Trading-Bot"
@@ -95,15 +97,25 @@ resource "aws_security_group" "rds_sg" {
   vpc_id      = aws_vpc.trading_vpc.id
 
   ingress {
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
+    from_port = 5432
+    to_port   = 5432
+    protocol  = "tcp"
 
-# allow from Oracle VM IP only
+    # allow from Oracle VM IP only
     cidr_blocks = [
       "${var.oracle_vm_ip}/32"
     ]
     description = "PostgreSQL from Oracle VM"
+  }
+
+  # Egress rule required for RDS enhanced monitoring, automated backups,
+  # and outbound service communication (e.g. Secrets Manager rotation Lambda).
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow all outbound traffic"
   }
 
   tags = {
@@ -140,11 +152,18 @@ resource "aws_secretsmanager_secret" "rds_master" {
 }
 
 resource "aws_secretsmanager_secret_version" "rds_master_version" {
-  secret_id     = aws_secretsmanager_secret.rds_master.id
+  secret_id = aws_secretsmanager_secret.rds_master.id
   secret_string = jsonencode({
     username = var.db_username,
     password = var.db_password
   })
+
+  # Prevent Terraform from overwriting the secret on every apply. This keeps
+  # applies idempotent and allows RDS-managed master passwords or manual
+  # rotations to persist without being clobbered by the variable value.
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
 }
 
 # RDS PostgreSQL
@@ -154,6 +173,22 @@ resource "aws_db_subnet_group" "trading_db_subnet" {
 
   tags = {
     Name = "mt5-trading-db-subnet"
+  }
+}
+
+# RDS parameter group enforcing SSL/TLS for all connections.
+resource "aws_db_parameter_group" "trading_db_pg" {
+  name        = "mt5-trading-db-pg17"
+  family      = "postgres17"
+  description = "Parameter group for mt5-trading-db - enforce SSL/TLS"
+
+  parameter {
+    name  = "rds.force_ssl"
+    value = "1"
+  }
+
+  tags = {
+    Name = "mt5-trading-db-pg17"
   }
 }
 
@@ -177,12 +212,16 @@ resource "aws_db_instance" "trading_db" {
 
   db_subnet_group_name   = aws_db_subnet_group.trading_db_subnet.name
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
+  parameter_group_name   = aws_db_parameter_group.trading_db_pg.name
 
   backup_retention_period = 7
   backup_window           = "03:00-04:00"
   maintenance_window      = "mon:04:00-mon:05:00"
 
-  skip_final_snapshot = var.environment == "dev" ? true : false
+  # Production safety: prevent accidental deletion of the trading database.
+  deletion_protection = true
+
+  skip_final_snapshot       = var.environment == "dev" ? true : false
   final_snapshot_identifier = var.environment == "dev" ? null : "mt5-trading-db-final-snapshot"
 
   tags = {
@@ -191,10 +230,10 @@ resource "aws_db_instance" "trading_db" {
 }
 
 #IAM User for Oracle VM to access S3
-resource "aws_iam_user" "oracle_bot_user"{
-  name  = "mt5-oracle_bot_user"
+resource "aws_iam_user" "oracle_bot_user" {
+  name = "mt5-oracle_bot_user"
 
-  tags  = {
+  tags = {
     Name = "Oracle Bot S3 Access"
   }
 }
@@ -261,9 +300,9 @@ resource "aws_s3_bucket" "model_storage" {
 resource "aws_s3_bucket_public_access_block" "model_storage_block" {
   bucket = aws_s3_bucket.model_storage.id
 
-  block_public_acls   = true
-  block_public_policy = true
-  ignore_public_acls  = true
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
   restrict_public_buckets = true
 }
 
@@ -285,6 +324,50 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "model_storage_enc
   }
 }
 
+# Lifecycle rules for ML model artifact cleanup.
+# Transition objects to STANDARD_IA after 30 days and expire after 90 days.
+# Versioning is preserved: noncurrent versions follow the same transition +
+# expiration schedule so old checkpoints don't accumulate indefinitely.
+resource "aws_s3_bucket_lifecycle_configuration" "model_storage_lifecycle" {
+  bucket = aws_s3_bucket.model_storage.id
+
+  # Ensure versioning is configured before applying lifecycle rules to avoid
+  # an error when Terraform evaluates noncurrent-version actions.
+  depends_on = [aws_s3_bucket_versioning.model_storage_versioning]
+
+  rule {
+    id     = "model-artifact-cleanup"
+    status = "Enabled"
+
+    filter {}
+
+    # Current (latest) version handling
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+
+    expiration {
+      days = 90
+    }
+
+    # Noncurrent (older) version handling - mirror the same policy
+    noncurrent_version_transition {
+      noncurrent_days = 30
+      storage_class   = "STANDARD_IA"
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 90
+    }
+
+    # Clean up aborted multipart uploads
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+}
+
 # Secrets Manager for MT5 Credentials
 resource "aws_secretsmanager_secret" "mt5_credentials" {
   name        = "mt5-trading-credentials-${var.environment}"
@@ -302,6 +385,13 @@ resource "aws_secretsmanager_secret_version" "mt5_credentials_version" {
     mt5_password = var.mt5_password
     mt5_server   = var.mt5_server
   })
+
+  # Prevent Terraform from regenerating the secret version on every apply.
+  # Secret values should be rotated via Secrets Manager rotation or manual
+  # updates, not by re-running `terraform apply`.
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
 }
 
 # SNS Topic for Alerts
