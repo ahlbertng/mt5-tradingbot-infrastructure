@@ -113,41 +113,34 @@ def check_account_balance():
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-        
-        # Get latest balance
-        cursor.execute("""
-            SELECT balance, equity, profit, timestamp
-            FROM account_metrics
-            ORDER BY timestamp DESC
-            LIMIT 1
-        """)
-        
-        result = cursor.fetchone()
-        
-        if result:
-            balance, equity, profit, timestamp = result
-            print(f"✅ Account Status (as of {timestamp}):")
-            print(f"   Balance: ${balance:,.2f}")
-            print(f"   Equity: ${equity:,.2f}")
-            print(f"   Profit: ${profit:,.2f}")
-            
-            # Calculate performance
-            initial_balance = 10000  # Adjust to your initial balance
-            pnl_pct = ((balance - initial_balance) / initial_balance) * 100
-            
-            if pnl_pct >= 0:
-                print(f"   Performance: +{pnl_pct:.2f}% 📈")
-            else:
-                print(f"   Performance: {pnl_pct:.2f}% 📉")
-            
-            return True
-        else:
-            print("⚠️  No account metrics found")
-            return False
-        
-                return True
+                cursor.execute("""
+                    SELECT balance, equity, profit, timestamp
+                    FROM account_metrics
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                """)
 
-        return False
+                result = cursor.fetchone()
+
+                if result:
+                    balance, equity, profit, timestamp = result
+                    print(f"✅ Account Status (as of {timestamp}):")
+                    print(f"   Balance: ${balance:,.2f}")
+                    print(f"   Equity: ${equity:,.2f}")
+                    print(f"   Profit: ${profit:,.2f}")
+
+                    initial_balance = 10000
+                    pnl_pct = ((balance - initial_balance) / initial_balance) * 100
+
+                    if pnl_pct >= 0:
+                        print(f"   Performance: +{pnl_pct:.2f}% 📈")
+                    else:
+                        print(f"   Performance: {pnl_pct:.2f}% 📉")
+
+                    return True
+                else:
+                    print("⚠️  No account metrics found")
+                    return False
 
     except Exception as e:
         print(f"❌ Account Check Error: {e}")

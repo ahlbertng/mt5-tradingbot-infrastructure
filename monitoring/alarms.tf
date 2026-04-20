@@ -1,22 +1,7 @@
 # CloudWatch Alarms for MT5 Trading Bot
 
-# Alarm: High CPU Usage
-resource "aws_cloudwatch_metric_alarm" "high_cpu" {
-  alarm_name          = "mt5-trading-bot-high-cpu"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "2"
-  metric_name         = "CPUUtilization"
-  namespace           = "AWS/EC2"
-  period              = "300"
-  statistic           = "Average"
-  threshold           = "80"
-  alarm_description   = "This metric monitors EC2 CPU utilization"
-  alarm_actions       = [aws_sns_topic.trading_alerts.arn]
-
-  dimensions = {
-    InstanceId = aws_instance.trading_bot.id
-  }
-}
+# EC2 CPU alarm removed: bot runs on Oracle Cloud VM, not EC2.
+# CPU monitoring is handled by the CloudWatch agent pushing custom metrics.
 
 # Alarm: Low Account Balance
 resource "aws_cloudwatch_metric_alarm" "low_balance" {
@@ -104,20 +89,5 @@ resource "aws_cloudwatch_metric_alarm" "rds_low_storage" {
   }
 }
 
-# Alarm: EC2 Instance Status Check Failed
-resource "aws_cloudwatch_metric_alarm" "instance_status_check" {
-  alarm_name          = "mt5-trading-bot-status-check"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "2"
-  metric_name         = "StatusCheckFailed"
-  namespace           = "AWS/EC2"
-  period              = "60"
-  statistic           = "Maximum"
-  threshold           = "0"
-  alarm_description   = "Alert when instance status check fails"
-  alarm_actions       = [aws_sns_topic.trading_alerts.arn]
-
-  dimensions = {
-    InstanceId = aws_instance.trading_bot.id
-  }
-}
+# EC2 status check alarm removed: bot runs on Oracle Cloud VM, not EC2.
+# Bot liveness is covered by the no_metrics alarm above.

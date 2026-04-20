@@ -1,0 +1,103 @@
+---
+# Production Inventory - Multi-Cloud Trading Bot Infrastructure
+# Environment: Production
+
+all:
+  vars:
+    # Project metadata
+    project_name: mt5-trading-bot
+    deployment_date: "{{ ansible_date_time.date }}"
+    deployed_by: "{{ lookup('env', 'USER') }}"
+    
+  children:
+  
+    # PRODUCTION ENVIRONMENT
+
+    production:
+      children:
+        compute_tier:
+          hosts:
+            oracle-vm-prod:
+              # Oracle Cloud ARM VM
+              ansible_host: "ORACLE_VM_IP_PENDING"  # Update after VM creation
+              ansible_port: 22
+              ansible_user: ubuntu
+              
+              # Instance metadata
+              cloud_provider: oracle
+              instance_type: VM.Standard.A1.Flex
+              cpu_count: 4
+              memory_gb: 24
+              
+              # AWS Integration (from Terraform outputs)
+              aws_region: us-east-1
+              db_endpoint: "{{ lookup('env', 'TF_OUTPUT_RDS_ENDPOINT') }}"
+              s3_bucket: mt5-trading-models-dev-398069593274
+              sns_topic_arn: "arn:aws:sns:us-east-1:398069593274:mt5-trading-alerts-dev"
+              
+              # Application configuration
+              bot_version: "1.0.0"
+              bot_repo: https://github.com/yourusername/mt5-trading-bot-infrastructure.git
+              bot_branch: main
+              bot_path: /home/ubuntu/mt5-trading-bot
+              
+              # Docker configuration
+              use_docker: true
+              docker_network: mt5-network
+              
+              # Monitoring
+              monitoring_enabled: true
+              cloudwatch_enabled: true
+              grafana_port: 3000
+              
+      vars:
+        # Environment-specific variables
+        environment: production
+        log_level: INFO
+        debug_mode: false
+        
+        # Security
+        ssl_enabled: true
+        firewall_enabled: true
+        
+        # Backup
+        backup_enabled: true
+        backup_retention_days: 0
+
+
+    # STAGING ENVIRONMENT (Optional)
+  
+    staging:
+      children:
+        compute_tier:
+          hosts:
+            oracle-vm-staging:
+              ansible_host: "STAGING_IP_PENDING"
+              ansible_user: ubuntu
+              environment: staging
+              bot_branch: develop
+              
+      vars:
+        log_level: DEBUG
+        debug_mode: true
+
+# AWS RESOURCE REFERENCES
+
+# These are managed by Terraform, referenced by Ansible
+aws_resources:
+  rds:
+    endpoint: "{{ lookup('env', 'TF_OUTPUT_RDS_ENDPOINT') }}"
+    port: 5432
+    database: trading_db
+    username: trading_admin
+    
+  s3:
+    bucket: mt5-trading-models-dev-398069593274
+    region: us-east-1
+    
+  cloudwatch:
+    log_group: /aws/ec2/mt5-trading-bot
+    namespace: MT5TradingBot/Oracle
+    
+  sns:
+    topic_arn: "arn:aws:sns:us-east-1:398069593274:mt5-trading-alerts-dev"

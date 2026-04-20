@@ -285,3 +285,4 @@ reports/
 !package.json
 !Pipfile
 terraform/outputs.txt
+CLAUDE.md

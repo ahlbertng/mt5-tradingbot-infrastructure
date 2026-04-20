@@ -1,0 +1,363 @@
+# MT5 TRADING BOT - PRODUCTION DEPLOYMENT PLAYBOOK
+
+- name: Deploy MT5 Trading Bot to Production
+  hosts: production
+  become: yes
+  gather_facts: yes
+  
+  vars_files:
+    - ../vars/secrets.yml
+    - ../vars/production.yml
+
+  pre_tasks:
+    - name: Display deployment information
+      debug:
+        msg: |
+          ═══════════════════════════════════════════════════════════
+          MT5 TRADING BOT - PRODUCTION DEPLOYMENT
+          ═══════════════════════════════════════════════════════════
+          Environment:    {{ environment }}
+          Target Host:    {{ inventory_hostname }}
+          Cloud Provider: {{ cloud_provider }}
+          Bot Version:    {{ bot_version }}
+          Deployment By:  {{ deployed_by }}
+          Timestamp:      {{ ansible_date_time.iso8601 }}
+          ═══════════════════════════════════════════════════════════
+      tags: [always]
+
+    - name: Verify Terraform outputs available
+      assert:
+        that:
+          - db_endpoint is defined
+          - s3_bucket is defined
+        fail_msg: "Terraform outputs not properly configured in inventory"
+      tags: [validation]
+
+    - name: Check system requirements
+      assert:
+        that:
+          - ansible_memtotal_mb >= 2048
+          - ansible_processor_vcpus >= 2
+        fail_msg: "Insufficient system resources"
+      tags: [validation]
+
+  roles:
+    - role: system-setup
+      tags: [system]
+    
+    - role: docker-setup
+      tags: [docker]
+    
+    - role: aws-integration
+      tags: [aws]
+    
+    - role: application-deployment
+      tags: [deploy]
+    
+    - role: monitoring-setup
+      tags: [monitoring]
+
+  tasks:
+  
+    # PHASE 1: SYSTEM PREPARATION
+
+    - name: Update system packages
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+        upgrade: safe
+      tags: [system, update]
+
+    - name: Install essential packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - software-properties-common
+          - git
+          - vim
+          - htop
+          - net-tools
+        state: present
+      tags: [system]
+
+    - name: Configure timezone
+      timezone:
+        name: UTC
+      tags: [system]
+
+    - name: Set hostname
+      hostname:
+        name: "{{ inventory_hostname }}"
+      tags: [system]
+
+  
+    # PHASE 2: DOCKER INSTALLATION
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      tags: [docker]
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=arm64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+      tags: [docker]
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+      tags: [docker]
+
+    - name: Add user to docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+      tags: [docker]
+
+    - name: Start and enable Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+      tags: [docker]
+
+
+    # PHASE 3: AWS INTEGRATION
+
+    - name: Install AWS CLI
+      apt:
+        name: awscli
+        state: present
+      tags: [aws]
+
+    - name: Configure AWS credentials
+      become_user: "{{ ansible_user }}"
+      shell: |
+        mkdir -p ~/.aws
+        cat > ~/.aws/credentials <<EOF
+        [default]
+        aws_access_key_id = {{ aws_access_key }}
+        aws_secret_access_key = {{ aws_secret_key }}
+        EOF
+        
+        cat > ~/.aws/config <<EOF
+        [default]
+        region = {{ aws_region }}
+        output = json
+        EOF
+        
+        chmod 600 ~/.aws/credentials ~/.aws/config
+      no_log: true
+      tags: [aws]
+
+    - name: Test AWS connectivity
+      become_user: "{{ ansible_user }}"
+      command: aws s3 ls s3://{{ s3_bucket }}/
+      register: aws_test
+      ignore_errors: yes
+      tags: [aws, test]
+
+    - name: Verify AWS connectivity
+      assert:
+        that: aws_test.rc == 0
+        fail_msg: "Cannot connect to AWS S3. Check credentials and permissions."
+      tags: [aws, test]
+
+  
+    # PHASE 4: CLOUDWATCH AGENT
+  
+    - name: Download CloudWatch agent
+      get_url:
+        url: https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb
+        dest: /tmp/amazon-cloudwatch-agent.deb
+      tags: [monitoring, cloudwatch]
+
+    - name: Install CloudWatch agent
+      apt:
+        deb: /tmp/amazon-cloudwatch-agent.deb
+      tags: [monitoring, cloudwatch]
+
+    - name: Create CloudWatch agent configuration
+      template:
+        src: ../templates/cloudwatch-config.json.j2
+        dest: /opt/aws/amazon-cloudwatch-agent/etc/config.json
+        mode: '0644'
+      tags: [monitoring, cloudwatch]
+
+    - name: Start CloudWatch agent
+      shell: |
+        /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+          -a fetch-config \
+          -m ec2 \
+          -s \
+          -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
+      tags: [monitoring, cloudwatch]
+
+    - name: Enable CloudWatch agent
+      systemd:
+        name: amazon-cloudwatch-agent
+        enabled: yes
+        state: started
+      tags: [monitoring, cloudwatch]
+
+  
+    # PHASE 5: APPLICATION DEPLOYMENT
+  
+    - name: Create application directory
+      file:
+        path: "{{ bot_path }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [deploy]
+
+    - name: Clone/Update bot repository
+      git:
+        repo: "{{ bot_repo }}"
+        dest: "{{ bot_path }}"
+        version: "{{ bot_branch }}"
+        force: yes
+      become_user: "{{ ansible_user }}"
+      tags: [deploy]
+
+    - name: Create environment file
+      template:
+        src: ../templates/env-production.j2
+        dest: "{{ bot_path }}/.env"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+      tags: [deploy, config]
+
+    - name: Create data directories
+      file:
+        path: "{{ bot_path }}/{{ item }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      loop:
+        - data
+        - data/logs
+        - data/models
+        - data/backups
+      tags: [deploy]
+
+    - name: Build Docker images
+      command:
+        cmd: docker compose build
+        chdir: "{{ bot_path }}"
+      become_user: "{{ ansible_user }}"
+      tags: [deploy, build]
+
+    - name: Start application services
+      command:
+        cmd: docker compose up -d
+        chdir: "{{ bot_path }}"
+      become_user: "{{ ansible_user }}"
+      tags: [deploy, start]
+
+    - name: Wait for services to be healthy
+      wait_for:
+        timeout: 60
+      tags: [deploy]
+
+  
+    # PHASE 6: VERIFICATION
+  
+    - name: Check running containers
+      command: docker ps
+      become_user: "{{ ansible_user }}"
+      register: container_status
+      tags: [verify]
+
+    - name: Display container status
+      debug:
+        var: container_status.stdout_lines
+      tags: [verify]
+
+    - name: Check bot logs
+      command:
+        cmd: docker compose logs --tail=50 trading-bot
+        chdir: "{{ bot_path }}"
+      become_user: "{{ ansible_user }}"
+      register: bot_logs
+      tags: [verify]
+
+    - name: Test database connectivity
+      command:
+        cmd: docker compose exec -T postgres psql -h {{ db_endpoint.split(':')[0] }} -U {{ db_username }} -d {{ db_name }} -c "SELECT 1;"
+        chdir: "{{ bot_path }}"
+      become_user: "{{ ansible_user }}"
+      environment:
+        PGPASSWORD: "{{ db_password }}"
+      register: db_test
+      ignore_errors: yes
+      tags: [verify, database]
+
+  post_tasks:
+    - name: Generate deployment report
+      template:
+        src: ../templates/deployment-report.j2
+        dest: "/tmp/deployment-report-{{ ansible_date_time.epoch }}.txt"
+      tags: [report]
+
+    - name: Display deployment summary
+      debug:
+        msg: |
+          ═══════════════════════════════════════════════════════════
+          DEPLOYMENT COMPLETED SUCCESSFULLY
+          ═══════════════════════════════════════════════════════════
+          
+          Access Information:
+          ═══════════════════════════════════════════════════════════
+          Grafana Dashboard:  http://{{ ansible_host }}:3000
+          Username:           admin
+          Password:           {{ grafana_password }}
+          
+          CloudWatch Logs:    {{ cloudwatch_log_group }}
+          S3 Models Bucket:   {{ s3_bucket }}
+          SNS Alerts:         {{ sns_topic_arn }}
+          
+          SSH Access:
+          ssh -i ~/.ssh/oracle-mt5-key ubuntu@{{ ansible_host }}
+          
+          Next Steps:
+          ═══════════════════════════════════════════════════════════
+          1. Access Grafana to view metrics
+          2. Check CloudWatch for alerts
+          3. Monitor bot logs: docker compose logs -f trading-bot
+          4. Verify email alerts from SNS
+          
+          ═══════════════════════════════════════════════════════════
+      tags: [always]
+
+  handlers:
+    - name: restart docker
+      systemd:
+        name: docker
+        state: restarted
+
+    - name: restart cloudwatch
+      systemd:
+        name: amazon-cloudwatch-agent
+        state: restarted
+
+    - name: restart bot
+      command:
+        cmd: docker compose restart trading-bot
+        chdir: "{{ bot_path }}"
+      become_user: "{{ ansible_user }}"

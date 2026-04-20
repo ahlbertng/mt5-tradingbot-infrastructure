@@ -1,0 +1,61 @@
+# MT5 Trading Bot - Production Environment
+# Deployed via Ansible to {{ inventory_hostname }}
+# Generated: {{ ansible_date_time.iso8601 }}
+
+# ==========================================
+# MT5 ACCOUNT
+# ==========================================
+MT5_LOGIN={{ mt5_login }}
+MT5_PASSWORD={{ mt5_password }}
+MT5_SERVER={{ mt5_server }}
+
+# ==========================================
+# AWS RDS DATABASE
+# ==========================================
+DB_ENDPOINT={{ db_endpoint }}
+DB_NAME={{ db_name }}
+DB_USERNAME={{ db_username }}
+DB_PASSWORD={{ db_password }}
+
+# ==========================================
+# AWS SERVICES
+# ==========================================
+S3_BUCKET={{ s3_bucket }}
+AWS_REGION={{ aws_region }}
+AWS_ACCESS_KEY_ID={{ aws_access_key }}
+AWS_SECRET_ACCESS_KEY={{ aws_secret_key }}
+SNS_TOPIC_ARN={{ sns_topic_arn }}
+
+# ==========================================
+# CLOUDWATCH MONITORING
+# ==========================================
+CLOUDWATCH_NAMESPACE=MT5TradingBot/Oracle
+CLOUDWATCH_LOG_GROUP=/aws/ec2/mt5-trading-bot
+CLOUDWATCH_ENABLED=true
+
+# ==========================================
+# RISK MANAGEMENT
+# ==========================================
+MAX_RISK_PER_TRADE={{ max_risk_per_trade | default('0.02') }}
+MAX_DAILY_LOSS={{ max_daily_loss | default('0.05') }}
+MAX_POSITIONS={{ max_positions | default('3') }}
+
+# ==========================================
+# APPLICATION
+# ==========================================
+LOG_LEVEL={{ log_level | default('INFO') }}
+ENVIRONMENT={{ environment }}
+BOT_VERSION={{ bot_version }}
+
+# ==========================================
+# MONITORING
+# ==========================================
+GRAFANA_USER=admin
+GRAFANA_PASSWORD={{ grafana_password }}
+
+# ==========================================
+# DEPLOYMENT METADATA
+# ==========================================
+DEPLOYED_BY={{ deployed_by }}
+DEPLOYMENT_DATE={{ deployment_date }}
+CLOUD_PROVIDER={{ cloud_provider }}

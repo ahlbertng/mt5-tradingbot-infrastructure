@@ -1,0 +1,18 @@
+MT5 Trading Bot - Deployment Report
+=====================================
+Date:        {{ ansible_date_time.iso8601 }}
+Environment: {{ environment }}
+Host:        {{ inventory_hostname }} ({{ ansible_host }})
+Bot Version: {{ bot_version }}
+Deployed By: {{ deployed_by }}
+
+AWS Resources
+-------------
+CloudWatch Log Group: {{ cloudwatch_log_group }}
+S3 Models Bucket:     {{ s3_bucket }}
+SNS Alerts Topic:     {{ sns_topic_arn }}
+
+Access
+------
+Grafana Dashboard: http://{{ ansible_host }}:3000
+SSH:               ssh -i ~/.ssh/oracle-mt5-key ubuntu@{{ ansible_host }}

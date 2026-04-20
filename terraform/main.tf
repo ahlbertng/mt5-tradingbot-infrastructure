@@ -99,9 +99,9 @@ resource "aws_security_group" "rds_sg" {
     to_port         = 5432
     protocol        = "tcp"
 
-# allow from Oracle VM IP 
+# allow from Oracle VM IP only
     cidr_blocks = [
-      "${var.oracle_vm_ip}/0"
+      "${var.oracle_vm_ip}/32"
     ]
     description = "PostgreSQL from Oracle VM"
   }
@@ -178,7 +178,7 @@ resource "aws_db_instance" "trading_db" {
   db_subnet_group_name   = aws_db_subnet_group.trading_db_subnet.name
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
 
-  backup_retention_period = 0
+  backup_retention_period = 7
   backup_window           = "03:00-04:00"
   maintenance_window      = "mon:04:00-mon:05:00"
 
