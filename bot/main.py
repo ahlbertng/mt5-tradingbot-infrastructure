@@ -259,16 +259,16 @@ class TradingBot:
                 logger.error("Cannot update metrics: account_info is None")
                 return
 
-            self.aws.publish_metric('AccountBalance', account_info['balance'])
-            self.aws.publish_metric('AccountEquity', account_info['equity'])
-            self.aws.publish_metric('TradesExecuted', self.trades_today)
-
-            # Calculate daily P&L using starting equity for the trading day
             if self.daily_start_equity is None:
                 self.daily_start_equity = account_info.get('equity')
 
             daily_pnl = account_info.get('equity', 0) - (self.daily_start_equity or 0)
-            self.aws.publish_metric('DailyPnL', daily_pnl)
+            self.aws.publish_metrics([
+                {'name': 'AccountBalance',  'value': account_info['balance']},
+                {'name': 'AccountEquity',   'value': account_info['equity']},
+                {'name': 'TradesExecuted',  'value': self.trades_today},
+                {'name': 'DailyPnL',        'value': daily_pnl},
+            ])
 
         except Exception as e:
             logger.error(f"Error updating metrics: {e}")

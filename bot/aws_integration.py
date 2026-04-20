@@ -3,6 +3,7 @@ AWS Integration - Handles all AWS services interactions
 """
 
 import boto3
+import botocore.exceptions
 import json
 import logging
 import os
@@ -33,9 +34,11 @@ class AWSIntegration:
         logger.info("AWS integration initialized")
     
     def _get_sns_topic_arn(self) -> str:
-        """Get SNS topic ARN"""
+        """Get SNS topic ARN from env var or by listing topics."""
+        arn = os.getenv('SNS_TOPIC_ARN', '')
+        if arn:
+            return arn
         try:
-            # List topics and find the trading alerts topic (paginated)
             token = None
             while True:
                 if token:
@@ -52,7 +55,7 @@ class AWSIntegration:
                     break
 
             return ''
-            
+
         except Exception as e:
             logger.error(f"Error getting SNS topic ARN: {e}")
             return ''
@@ -76,62 +79,55 @@ class AWSIntegration:
             logger.error(f"Error getting MT5 credentials: {e}")
             return {}
     
+    # S3 key layout:
+    #   models/ppo/v{timestamp}/model.zip  — versioned checkpoint
+    #   models/latest/model.zip            — pointer updated on every successful upload
+
     def upload_model(self, local_path: str) -> bool:
-        """Upload ML model to S3"""
+        """Upload ML model to S3 under a versioned key, then update the latest pointer."""
         try:
             if not self.s3_bucket:
                 logger.warning("No S3 bucket configured")
                 return False
-            
-            # Generate S3 key with timestamp
+
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            s3_key = f"models/trading_model_{timestamp}.zip"
-            
-            # Upload to S3
-            self.s3_client.upload_file(
-                local_path,
-                self.s3_bucket,
-                s3_key
-            )
-            
-            # Also upload as 'latest'
-            self.s3_client.upload_file(
-                local_path,
-                self.s3_bucket,
-                'models/trading_model_latest.zip'
-            )
-            
-            logger.info(f"Model uploaded to S3: s3://{self.s3_bucket}/{s3_key}")
+            versioned_key = f"models/ppo/v{timestamp}/model.zip"
+            latest_key = "models/latest/model.zip"
+
+            self.s3_client.upload_file(local_path, self.s3_bucket, versioned_key)
+            self.s3_client.upload_file(local_path, self.s3_bucket, latest_key)
+
+            logger.info(f"Model uploaded to S3: s3://{self.s3_bucket}/{versioned_key}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error uploading model to S3: {e}")
             return False
-    
+
     def download_model(self, local_path: str) -> bool:
-        """Download ML model from S3"""
+        """Download the latest ML model from S3. Returns False (not an error) if none exists yet."""
         try:
             if not self.s3_bucket:
                 logger.warning("No S3 bucket configured")
                 return False
-            
-            s3_key = 'models/trading_model_latest.zip'
-            
-            # Ensure directory exists if a directory component is present
+
+            latest_key = "models/latest/model.zip"
+
             dirpath = os.path.dirname(local_path)
             if dirpath:
                 os.makedirs(dirpath, exist_ok=True)
-            
-            # Download from S3
-            self.s3_client.download_file(
-                self.s3_bucket,
-                s3_key,
-                local_path
-            )
-            
-            logger.info(f"Model downloaded from S3: s3://{self.s3_bucket}/{s3_key}")
+
+            try:
+                self.s3_client.download_file(self.s3_bucket, latest_key, local_path)
+            except botocore.exceptions.ClientError as e:
+                if e.response['Error']['Code'] in ('404', 'NoSuchKey'):
+                    logger.info("No model found in S3 yet — starting without a pre-trained model")
+                    return False
+                raise
+
+            logger.info(f"Model downloaded from S3: s3://{self.s3_bucket}/{latest_key}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error downloading model from S3: {e}")
             return False
@@ -183,6 +179,31 @@ class AWSIntegration:
             logger.error(f"Error publishing metric to CloudWatch: {e}")
             return False
     
+    def publish_metrics(self, metrics: list) -> bool:
+        """Publish multiple metrics to CloudWatch in a single API call.
+
+        Each entry: {'name': str, 'value': float, 'unit': str (optional)}
+        """
+        try:
+            now = datetime.now(timezone.utc)
+            metric_data = [
+                {
+                    'MetricName': m['name'],
+                    'Value': float(m['value']),
+                    'Unit': m.get('unit', 'None'),
+                    'Timestamp': now,
+                }
+                for m in metrics
+            ]
+            self.cloudwatch_client.put_metric_data(
+                Namespace='MT5TradingBot',
+                MetricData=metric_data,
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Error publishing metrics to CloudWatch: {e}")
+            return False
+
     def upload_logs(self, log_file: str) -> bool:
         """Upload log file to S3"""
         try:

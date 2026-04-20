@@ -62,7 +62,7 @@ all:
         
         # Backup
         backup_enabled: true
-        backup_retention_days: 0
+        backup_retention_days: 7
 
 
     # STAGING ENVIRONMENT (Optional)

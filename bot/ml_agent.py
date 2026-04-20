@@ -192,18 +192,22 @@ class TradingAgent:
         self.model_path = os.path.join(os.environ.get("MODEL_PATH", "/app/models"), "trading_model.zip")
         
     def initialize(self):
-        """Initialize or load the model"""
+        """Initialize or load the model — tries S3 before giving up."""
         try:
-            # Try to load existing model
             if os.path.exists(self.model_path):
-                logger.info("Loading existing model...")
+                logger.info("Loading existing model from disk...")
                 self.model = PPO.load(self.model_path)
                 self.is_trained = True
-                logger.info("Model loaded successfully")
+                logger.info("Model loaded from disk successfully")
             else:
-                logger.info("No existing model found. Will create new model.")
-                self.is_trained = False
-            
+                logger.info("No local model found — attempting S3 download...")
+                loaded = self.load_model()
+                if not loaded:
+                    logger.warning(
+                        "No model available locally or in S3. "
+                        "Bot will return HOLD signals until trained offline."
+                    )
+
         except Exception as e:
             logger.error(f"Error initializing agent: {e}")
     
@@ -253,11 +257,13 @@ class TradingAgent:
     ) -> Dict[str, Any]:
         """Get trading signal from the agent"""
         try:
-            # If not trained, train on available data first
-            if not self.is_trained:
-                logger.info("Agent not trained. Training on current data...")
-                self.train(market_data, timesteps=50000)
-            
+            if not self.is_trained or self.model is None:
+                logger.warning(
+                    "Model not trained — returning HOLD. "
+                    "Train the model offline and upload to S3 before live trading."
+                )
+                return {'action': 'HOLD', 'symbol': 'EURUSD', 'confidence': 0}
+
             # Create temporary environment for prediction
             env = TradingEnvironment(market_data, initial_balance=account_info['balance'])
             obs, _ = env.reset()
@@ -269,11 +275,6 @@ class TradingAgent:
             except Exception:
                 # fallback to reset observation
                 obs, _ = env.reset()
-
-            # Ensure model is loaded
-            if self.model is None:
-                logger.warning("Model not loaded, returning HOLD signal")
-                return {'action': 'HOLD', 'symbol': 'EURUSD', 'confidence': 0}
 
             # Get action from model
             action, _states = self.model.predict(obs, deterministic=True)
@@ -320,27 +321,41 @@ class TradingAgent:
         # for periodic retraining
         pass
     
-    def save_model(self):
-        """Save model to disk and S3"""
+    def _validate_model(self) -> bool:
+        """Smoke-test the model with a dummy observation before persisting."""
         try:
-            if self.model is not None:
-                # Save locally
-                dirpath = os.path.dirname(self.model_path)
-                if dirpath:
-                    os.makedirs(dirpath, exist_ok=True)
+            dummy_obs = np.zeros(10, dtype=np.float32)
+            self.model.predict(dummy_obs, deterministic=True)
+            return True
+        except Exception as e:
+            logger.error(f"Model validation failed: {e}")
+            return False
 
-                self.model.save(self.model_path)
-                logger.info(f"Model saved to {self.model_path}")
+    def save_model(self):
+        """Save model to disk and S3 after validation."""
+        try:
+            if self.model is None:
+                return
 
-                # Upload to S3 with error handling
-                if self.aws:
-                    try:
-                        ok = self.aws.upload_model(self.model_path)
-                        if not ok:
-                            logger.warning(f"Upload to S3 reported failure for {self.model_path}")
-                    except Exception as e:
-                        logger.error(f"S3 upload failed for {self.model_path}: {e}")
-                
+            if not self._validate_model():
+                logger.error("Model failed smoke-test — skipping save and S3 upload")
+                return
+
+            dirpath = os.path.dirname(self.model_path)
+            if dirpath:
+                os.makedirs(dirpath, exist_ok=True)
+
+            self.model.save(self.model_path)
+            logger.info(f"Model saved to {self.model_path}")
+
+            if self.aws:
+                try:
+                    ok = self.aws.upload_model(self.model_path)
+                    if not ok:
+                        logger.warning(f"Upload to S3 reported failure for {self.model_path}")
+                except Exception as e:
+                    logger.error(f"S3 upload failed for {self.model_path}: {e}")
+
         except Exception as e:
             logger.error(f"Error saving model: {e}")
     

@@ -1,0 +1,87 @@
+---
+# MT5 TRADING BOT - LIFECYCLE MANAGEMENT PLAYBOOK
+# Usage:
+#   ansible-playbook ansible/playbooks/manage-bot.yml -e "action=start"
+#   ansible-playbook ansible/playbooks/manage-bot.yml -e "action=stop"
+#   ansible-playbook ansible/playbooks/manage-bot.yml -e "action=restart"
+#   ansible-playbook ansible/playbooks/manage-bot.yml -e "action=logs"
+#   ansible-playbook ansible/playbooks/manage-bot.yml -e "action=status"
+
+- name: Manage MT5 Trading Bot
+  hosts: production
+  become: no
+  gather_facts: no
+
+  vars_files:
+    - ../vars/production.yml
+
+  vars:
+    _valid_actions: [start, stop, restart, logs, status]
+    action: status
+
+  pre_tasks:
+    - name: Validate action parameter
+      assert:
+        that: action in _valid_actions
+        fail_msg: "Invalid action '{{ action }}'. Valid actions: {{ _valid_actions | join(', ') }}"
+
+  tasks:
+    - name: Start trading bot
+      command:
+        cmd: docker compose up -d trading-bot
+        chdir: "{{ bot_path }}"
+      when: action == 'start'
+      register: _start
+
+    - name: Show start output
+      debug:
+        var: _start.stdout_lines
+      when: action == 'start'
+
+    - name: Stop trading bot
+      command:
+        cmd: docker compose stop trading-bot
+        chdir: "{{ bot_path }}"
+      when: action == 'stop'
+      register: _stop
+
+    - name: Show stop output
+      debug:
+        var: _stop.stdout_lines
+      when: action == 'stop'
+
+    - name: Restart trading bot
+      command:
+        cmd: docker compose restart trading-bot
+        chdir: "{{ bot_path }}"
+      when: action == 'restart'
+      register: _restart
+
+    - name: Show restart output
+      debug:
+        var: _restart.stdout_lines
+      when: action == 'restart'
+
+    - name: Fetch bot logs
+      command:
+        cmd: docker compose logs --tail=100 --no-log-prefix trading-bot
+        chdir: "{{ bot_path }}"
+      when: action == 'logs'
+      register: _logs
+
+    - name: Show bot logs
+      debug:
+        var: _logs.stdout_lines
+      when: action == 'logs'
+
+    - name: Get container status
+      command: >
+        docker ps --filter "name=mt5"
+        --format "table {{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}\t{{ '{{' }}.Ports{{ '}}' }}"
+      when: action == 'status'
+      register: _status
+
+    - name: Show container status
+      debug:
+        var: _status.stdout_lines
+      when: action == 'status'

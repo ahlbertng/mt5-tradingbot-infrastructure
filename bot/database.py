@@ -67,21 +67,24 @@ class DatabaseManager:
                 port=self.db_port,
                 database=self.db_name,
                 user=self.db_username,
-                password=self.db_password
-                ,connect_timeout=self.db_connect_timeout
+                password=self.db_password,
+                connect_timeout=self.db_connect_timeout,
             )
-            # Use context-managed cursors per operation
-            
             logger.info(f"Connected to database: {self.db_name}@{self.db_host}")
-            
-            # Create tables if they don't exist
             self._create_tables()
-            
             return True
-            
+
         except Exception as e:
             logger.error(f"Error connecting to database: {e}", exc_info=True)
+            self.conn = None
             return False
+
+    def _ensure_connected(self) -> bool:
+        """Return True if the connection is alive, reconnect if not."""
+        if self.conn is not None and self.conn.closed == 0:
+            return True
+        logger.warning("Database connection unavailable, reconnecting...")
+        return self.connect()
     
     def disconnect(self):
         """Disconnect from database"""
@@ -182,6 +185,8 @@ class DatabaseManager:
     
     def log_trade(self, trade: Dict[str, Any]) -> bool:
         """Log a trade to the database"""
+        if not self._ensure_connected():
+            return False
         try:
             with self.conn.cursor() as cur:
                 cur.execute(
@@ -223,6 +228,8 @@ class DatabaseManager:
     
     def update_trade(self, order_id: int, close_price: float, profit: float, close_time: datetime) -> bool:
         """Update a trade with close information"""
+        if not self._ensure_connected():
+            return False
         try:
             with self.conn.cursor() as cur:
                 cur.execute(
@@ -250,6 +257,8 @@ class DatabaseManager:
     
     def log_account_metrics(self, metrics: Dict[str, Any]) -> bool:
         """Log account metrics"""
+        if not self._ensure_connected():
+            return False
         try:
             with self.conn.cursor() as cur:
                 cur.execute("""
@@ -271,6 +280,8 @@ class DatabaseManager:
     
     def get_trade_statistics(self, days: int = 30) -> Dict[str, Any]:
         """Get trading statistics for the specified period"""
+        if not self._ensure_connected():
+            return {}
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
@@ -296,6 +307,8 @@ class DatabaseManager:
     
     def get_recent_trades(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent trades"""
+        if not self._ensure_connected():
+            return []
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
@@ -312,6 +325,8 @@ class DatabaseManager:
     
     def cache_market_data(self, symbol: str, timeframe: str, data: List[Dict[str, Any]]) -> bool:
         """Cache market data to database"""
+        if not self._ensure_connected():
+            return False
         try:
             with self.conn.cursor() as cur:
                 for bar in data:
