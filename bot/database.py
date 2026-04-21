@@ -323,6 +323,26 @@ class DatabaseManager:
             logger.error(f"Error getting recent trades: {e}")
             return []
     
+    def get_daily_pnl_history(self, days: int = 30) -> List[float]:
+        """Return list of daily total P&L values (one per trading day) for the last N days."""
+        if not self._ensure_connected():
+            return []
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute("""
+                    SELECT SUM(profit)
+                    FROM trades
+                    WHERE close_time >= NOW() - (%s::int * INTERVAL '1 day')
+                      AND status = 'CLOSED'
+                      AND profit IS NOT NULL
+                    GROUP BY DATE(close_time)
+                    ORDER BY DATE(close_time)
+                """, (days,))
+                return [float(row[0]) for row in cur.fetchall()]
+        except Exception as e:
+            logger.error(f"Error getting daily P&L history: {e}")
+            return []
+
     def cache_market_data(self, symbol: str, timeframe: str, data: List[Dict[str, Any]]) -> bool:
         """Cache market data to database"""
         if not self._ensure_connected():

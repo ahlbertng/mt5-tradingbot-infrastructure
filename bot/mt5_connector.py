@@ -200,27 +200,28 @@ class MT5Connector:
                 "type_filling": mt5.ORDER_FILLING_IOC,
             }
             
-            # Add stop loss and take profit if provided
             if stop_loss is not None:
                 request["sl"] = stop_loss
             if take_profit is not None:
                 request["tp"] = take_profit
-            
-            # Send order
+
+            _t0 = time.monotonic()
             result = mt5.order_send(request)
-            
+            latency_ms = (time.monotonic() - _t0) * 1000
+
             if result is None:
-                return {'success': False, 'error': 'Order send failed'}
+                return {'success': False, 'error': 'Order send failed', 'latency_ms': latency_ms}
 
             if not hasattr(result, 'retcode') or result.retcode != mt5.TRADE_RETCODE_DONE:
                 return {
                     'success': False,
                     'error': f'Order failed with retcode: {getattr(result, "retcode", None)}',
-                    'result': getattr(result, '_asdict', lambda: None)()
+                    'result': getattr(result, '_asdict', lambda: None)(),
+                    'latency_ms': latency_ms,
                 }
-            
-            logger.info(f"Order placed successfully: {result.order}")
-            
+
+            logger.info(f"Order placed successfully: {result.order} ({latency_ms:.0f} ms)")
+
             return {
                 'success': True,
                 'order_id': result.order,
@@ -228,7 +229,8 @@ class MT5Connector:
                 'price': result.price,
                 'symbol': symbol,
                 'type': order_type,
-                'timestamp': datetime.now()
+                'timestamp': datetime.now(),
+                'latency_ms': latency_ms,
             }
             
         except Exception as e:

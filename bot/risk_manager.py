@@ -13,31 +13,38 @@ class RiskManager:
     
     def __init__(
         self,
-        max_risk_per_trade: float = 0.02,  # 2% per trade
-        max_daily_loss: float = 0.05,      # 5% max daily loss
-        max_positions: int = 3,             # Max concurrent positions
-        max_leverage: float = 10.0          # Max leverage
+        max_risk_per_trade: float = 0.02,   # 2% per trade
+        max_daily_loss: float = 0.05,        # 5% max daily loss
+        max_positions: int = 3,              # Max concurrent positions
+        max_leverage: float = 10.0,          # Max leverage
+        trail_activate_pct: float = 0.01,    # trailing stop activates at 1% profit
+        trail_distance_pct: float = 0.005,   # trailing stop trails 0.5% behind peak
     ):
         """Initialize risk manager"""
         self.max_risk_per_trade = max_risk_per_trade
         self.max_daily_loss = max_daily_loss
         self.max_positions = max_positions
         self.max_leverage = max_leverage
-        
+        self.trail_activate_pct = trail_activate_pct
+        self.trail_distance_pct = trail_distance_pct
+
         self.daily_start_balance = None
         self.daily_losses = 0.0
-        # Track per-position peak profit percentages for trailing stops
-        # Keyed by position ticket or identifier
+        self.daily_loss_halt = False  # sticky flag — cleared only on day rollover
         self.position_peaks = {}
         
     def check_risk_limits(self, account_info: Dict[str, Any]) -> bool:
         """Check if risk limits are within acceptable ranges"""
         try:
+            # Sticky daily halt — once triggered, no new trades until day rollover
+            if self.daily_loss_halt:
+                logger.warning("Daily loss halt active — no new trades until tomorrow")
+                return False
+
             # Initialize daily start balance if not set
             if self.daily_start_balance is None:
                 self.daily_start_balance = account_info['balance']
-            
-            # Check daily loss limit
+
             current_balance = account_info['balance']
 
             # Enforce max positions if caller provides current open positions
@@ -48,7 +55,6 @@ class RiskManager:
                         logger.warning(f"Max positions reached: {open_positions} >= {self.max_positions}")
                         return False
                 except Exception:
-                    # If parsing fails, continue but log
                     logger.debug(f"Unable to parse open_positions from account_info: {open_positions}")
 
             # Guard division by zero
@@ -59,9 +65,12 @@ class RiskManager:
             daily_loss_pct = (self.daily_start_balance - current_balance) / self.daily_start_balance
 
             if daily_loss_pct >= self.max_daily_loss:
-                logger.warning(f"Daily loss limit reached: {daily_loss_pct:.2%}")
-                # Update daily_losses
                 self.daily_losses += max(0.0, self.daily_start_balance - current_balance)
+                self.daily_loss_halt = True
+                logger.warning(
+                    f"Daily loss limit reached: {daily_loss_pct:.2%} >= {self.max_daily_loss:.2%}. "
+                    "Halting new trades for the rest of the day."
+                )
                 return False
             
             # Check margin level
@@ -148,24 +157,22 @@ class RiskManager:
                     pass
                 return True
             
-            # Implement trailing stop (close if price dropped 50% from peak profit)
+            # Trailing stop: activates at trail_activate_pct profit,
+            # then closes if pnl falls more than trail_distance_pct below the peak.
             ticket = position.get('ticket')
-            # Only start tracking after a small profit threshold
-            profit_threshold = 0.02
 
-            if pnl_pct > profit_threshold:
-                # update peak
-                if ticket is not None:
-                    prev_peak = self.position_peaks.get(ticket, 0.0)
-                    new_peak = max(prev_peak, pnl_pct)
-                    self.position_peaks[ticket] = new_peak
+            if pnl_pct >= self.trail_activate_pct and ticket is not None:
+                prev_peak = self.position_peaks.get(ticket, 0.0)
+                self.position_peaks[ticket] = max(prev_peak, pnl_pct)
 
-            # if we have a recorded peak and current pnl has fallen to <=50% of peak, close
             if ticket is not None and ticket in self.position_peaks:
-                peak = self.position_peaks.get(ticket, 0.0)
-                if peak > 0 and pnl_pct <= peak * 0.5:
-                    logger.info(f"Trailing stop triggered for ticket {ticket}: pnl={pnl_pct:.2%}, peak={peak:.2%}")
-                    # clear peak to avoid repeated triggers
+                peak = self.position_peaks[ticket]
+                if pnl_pct <= peak - self.trail_distance_pct:
+                    logger.info(
+                        f"Trailing stop triggered for ticket {ticket}: "
+                        f"pnl={pnl_pct:.2%}, peak={peak:.2%}, "
+                        f"trail={self.trail_distance_pct:.2%}"
+                    )
                     try:
                         del self.position_peaks[ticket]
                     except Exception:
@@ -208,7 +215,7 @@ class RiskManager:
         """Reset daily tracking metrics (call at start of each day)"""
         self.daily_start_balance = None
         self.daily_losses = 0.0
-        # Reset any per-position peak tracking
+        self.daily_loss_halt = False
         self.position_peaks = {}
         logger.info("Daily risk metrics reset")
 

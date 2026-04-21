@@ -19,19 +19,20 @@ resource "aws_cloudwatch_metric_alarm" "low_balance" {
 }
 
 # Alarm: High Daily Loss
+# Period 300s so the alarm fires within ~5 minutes of a loss breach (SLO: alert within 60s
+# is aspirational; 5 min is the CloudWatch minimum viable window for this metric frequency).
 resource "aws_cloudwatch_metric_alarm" "high_daily_loss" {
   alarm_name          = "mt5-trading-bot-high-daily-loss"
   comparison_operator = "LessThanThreshold"
   evaluation_periods  = "1"
   metric_name         = "DailyPnL"
   namespace           = "MT5TradingBot"
-  # Aggregate over a full UTC day to detect daily loss totals reliably
-  period             = "86400"
-  statistic          = "Sum"
-  threshold          = "-400" # Alert if daily loss exceeds $400 (4% of $10k)
-  alarm_description  = "Alert when daily loss is too high"
-  alarm_actions      = [aws_sns_topic.trading_alerts.arn]
-  treat_missing_data = "notBreaching"
+  period              = "300"
+  statistic           = "Average"
+  threshold           = "-400"
+  alarm_description   = "Daily loss exceeded $400 (4% of $10k account)"
+  alarm_actions       = [aws_sns_topic.trading_alerts.arn]
+  treat_missing_data  = "notBreaching"
 }
 
 # Alarm: No Metrics Received (Bot Down)
@@ -103,10 +104,40 @@ resource "aws_cloudwatch_metric_alarm" "no_trades_6h" {
   evaluation_periods  = "1"
   metric_name         = "TradesExecuted"
   namespace           = "MT5TradingBot"
-  period              = "21600" # 6 hours
+  period              = "21600"
   statistic           = "Sum"
   threshold           = "0"
-  alarm_description   = "Alert when no trades have been executed over a 6-hour window"
+  alarm_description   = "No trades executed in the last 6 hours"
   alarm_actions       = [aws_sns_topic.trading_alerts.arn]
   treat_missing_data  = "breaching"
+}
+
+# Alarm: Order Placement Latency SLO breach (> 2 seconds)
+resource "aws_cloudwatch_metric_alarm" "order_latency_high" {
+  alarm_name          = "mt5-trading-bot-order-latency-high"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "3"
+  metric_name         = "OrderLatencyMs"
+  namespace           = "MT5TradingBot"
+  period              = "60"
+  statistic           = "p99"
+  threshold           = "2000"
+  alarm_description   = "p99 order placement latency exceeded 2000 ms (SLO breach)"
+  alarm_actions       = [aws_sns_topic.trading_alerts.arn]
+  treat_missing_data  = "notBreaching"
+}
+
+# Alarm: Negative Sharpe Ratio (strategy losing edge)
+resource "aws_cloudwatch_metric_alarm" "negative_sharpe" {
+  alarm_name          = "mt5-trading-bot-negative-sharpe"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "SharpeRatio"
+  namespace           = "MT5TradingBot"
+  period              = "3600"
+  statistic           = "Average"
+  threshold           = "0"
+  alarm_description   = "Annualised Sharpe ratio is negative for 2 consecutive hours — strategy may have lost edge"
+  alarm_actions       = [aws_sns_topic.trading_alerts.arn]
+  treat_missing_data  = "notBreaching"
 }

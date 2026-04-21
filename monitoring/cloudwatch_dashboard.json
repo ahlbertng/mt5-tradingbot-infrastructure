@@ -2,104 +2,153 @@
   "widgets": [
     {
       "type": "metric",
+      "x": 0, "y": 0, "width": 12, "height": 6,
       "properties": {
         "metrics": [
-          ["MT5TradingBot", "AccountBalance", {"stat": "Average"}],
-          ["MT5TradingBot", "AccountEquity", {"stat": "Average"}]
+          ["MT5TradingBot", "AccountBalance", {"stat": "Average", "color": "#1f77b4", "label": "Balance"}],
+          ["MT5TradingBot", "AccountEquity",  {"stat": "Average", "color": "#ff7f0e", "label": "Equity"}]
         ],
         "view": "timeSeries",
         "stacked": false,
         "region": "us-east-1",
         "title": "Account Balance & Equity",
         "period": 300,
-        "yAxis": {
-          "left": {
-            "label": "USD"
-          }
-        }
+        "yAxis": { "left": { "label": "USD" } }
       }
     },
     {
       "type": "metric",
+      "x": 12, "y": 0, "width": 12, "height": 6,
       "properties": {
         "metrics": [
-          ["MT5TradingBot", "DailyPnL", {"stat": "Sum", "color": "#2ca02c"}]
+          ["MT5TradingBot", "DailyPnL", {"stat": "Average", "color": "#2ca02c", "label": "Daily P&L"}]
         ],
         "view": "timeSeries",
         "stacked": false,
         "region": "us-east-1",
         "title": "Daily Profit & Loss",
-        "period": 3600,
-        "yAxis": {
-          "left": {
-            "label": "USD"
-          }
-        }
+        "period": 300,
+        "yAxis": { "left": { "label": "USD" } }
       }
     },
     {
       "type": "metric",
+      "x": 0, "y": 6, "width": 6, "height": 6,
       "properties": {
         "metrics": [
-          ["MT5TradingBot", "TradesExecuted", {"stat": "Sum"}]
+          ["MT5TradingBot", "TradesExecuted", {"stat": "Sum", "label": "Trades Today"}]
+        ],
+        "view": "singleValue",
+        "region": "us-east-1",
+        "title": "Trades Executed Today",
+        "period": 86400
+      }
+    },
+    {
+      "type": "metric",
+      "x": 6, "y": 6, "width": 6, "height": 6,
+      "properties": {
+        "metrics": [
+          ["MT5TradingBot", "SharpeRatio", {"stat": "Average", "color": "#9467bd", "label": "Sharpe (annualised)"}]
+        ],
+        "view": "singleValue",
+        "region": "us-east-1",
+        "title": "Sharpe Ratio (30d)",
+        "period": 3600
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12, "y": 6, "width": 6, "height": 6,
+      "properties": {
+        "metrics": [
+          ["MT5TradingBot", "DailyVaR95", {"stat": "Average", "color": "#d62728", "label": "95% VaR (USD)"}]
+        ],
+        "view": "singleValue",
+        "region": "us-east-1",
+        "title": "Daily VaR 95% (30d)",
+        "period": 3600
+      }
+    },
+    {
+      "type": "metric",
+      "x": 18, "y": 6, "width": 6, "height": 6,
+      "properties": {
+        "metrics": [
+          ["MT5TradingBot", "OrderLatencyMs", {"stat": "p99", "color": "#e377c2", "label": "p99 latency (ms)"}]
+        ],
+        "view": "singleValue",
+        "region": "us-east-1",
+        "title": "Order Latency p99",
+        "period": 300
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0, "y": 12, "width": 24, "height": 6,
+      "properties": {
+        "metrics": [
+          ["MT5TradingBot", "OrderLatencyMs", {"stat": "p50",  "label": "p50"}],
+          ["MT5TradingBot", "OrderLatencyMs", {"stat": "p95",  "label": "p95"}],
+          ["MT5TradingBot", "OrderLatencyMs", {"stat": "p99",  "label": "p99"}]
         ],
         "view": "timeSeries",
         "stacked": false,
         "region": "us-east-1",
-        "title": "Trades Executed",
-        "period": 3600,
+        "title": "Order Placement Latency (ms) — SLO: p99 < 2000 ms",
+        "period": 300,
+        "annotations": {
+          "horizontal": [
+            { "label": "SLO threshold", "value": 2000, "color": "#d62728" }
+          ]
+        },
+        "yAxis": { "left": { "label": "ms", "min": 0 } }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0, "y": 18, "width": 12, "height": 6,
+      "properties": {
+        "metrics": [
+          ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", "REPLACE_WITH_DB_INSTANCE_IDENTIFIER", {"stat": "Average", "label": "Connections"}],
+          ["AWS/RDS", "CPUUtilization",      "DBInstanceIdentifier", "REPLACE_WITH_DB_INSTANCE_IDENTIFIER", {"stat": "Average", "yAxis": "right", "label": "CPU %"}]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "title": "RDS Health",
+        "period": 300,
         "yAxis": {
-          "left": {
-            "label": "Count"
-          }
+          "left":  { "label": "Connections" },
+          "right": { "label": "Percent", "min": 0, "max": 100 }
         }
       }
     },
     {
+      "type": "alarm",
+      "x": 12, "y": 18, "width": 12, "height": 6,
+      "properties": {
+        "title": "Alarm Status",
+        "alarms": [
+          "arn:aws:cloudwatch:us-east-1:ACCOUNT_ID:alarm:mt5-trading-bot-low-balance",
+          "arn:aws:cloudwatch:us-east-1:ACCOUNT_ID:alarm:mt5-trading-bot-high-daily-loss",
+          "arn:aws:cloudwatch:us-east-1:ACCOUNT_ID:alarm:mt5-trading-bot-no-metrics",
+          "arn:aws:cloudwatch:us-east-1:ACCOUNT_ID:alarm:mt5-trading-bot-no-trades-6h",
+          "arn:aws:cloudwatch:us-east-1:ACCOUNT_ID:alarm:mt5-trading-bot-order-latency-high",
+          "arn:aws:cloudwatch:us-east-1:ACCOUNT_ID:alarm:mt5-trading-bot-negative-sharpe",
+          "arn:aws:cloudwatch:us-east-1:ACCOUNT_ID:alarm:mt5-rds-high-cpu",
+          "arn:aws:cloudwatch:us-east-1:ACCOUNT_ID:alarm:mt5-rds-low-storage"
+        ]
+      }
+    },
+    {
       "type": "log",
+      "x": 0, "y": 24, "width": 24, "height": 6,
       "properties": {
         "query": "SOURCE '/aws/ec2/mt5-trading-bot'\n| fields @timestamp, @message\n| filter @message like /ERROR/\n| sort @timestamp desc\n| limit 20",
         "region": "us-east-1",
         "title": "Recent Errors",
         "stacked": false
-      }
-    },
-    {
-      "type": "metric",
-      "properties": {
-        "metrics": [
-          ["AWS/EC2", "CPUUtilization", "InstanceId", "REPLACE_WITH_INSTANCE_ID", {"stat": "Average"}]
-        ],
-        "view": "timeSeries",
-        "stacked": false,
-        "region": "us-east-1",
-        "title": "EC2 CPU Utilization",
-        "period": 300,
-        "yAxis": {
-          "left": {
-            "min": 0,
-            "max": 100,
-            "label": "Percent"
-          }
-        }
-      }
-    },
-    {
-      "type": "metric",
-      "properties": {
-        "metrics": [
-          ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", "REPLACE_WITH_DB_INSTANCE_IDENTIFIER", {"stat": "Average", "color": "#1f77b4"}],
-          ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", "REPLACE_WITH_DB_INSTANCE_IDENTIFIER", {"stat": "Average", "color": "#ff7f0e", "yAxis": "right"}]
-        ],
-        "view": "timeSeries",
-        "stacked": false,
-        "region": "us-east-1",
-        "title": "RDS Metrics",
-        "period": 300,
-        "yAxis": {
-          "left": {"label": "Connections"},
-          "right": {"label": "Percent", "min": 0, "max": 100}
-        }
       }
     }
   ]

@@ -62,6 +62,7 @@ class TradingBot:
         self.max_trades_per_day = 50
         self.current_trading_day = datetime.now().date()
         self.daily_start_equity = None
+        self._last_risk_metrics_time = 0.0  # epoch; recompute Sharpe/VaR once per hour
         
     def start(self):
         """Start the trading bot"""
@@ -243,6 +244,11 @@ class TradingBot:
             
             if result['success']:
                 logger.info(f"Trade executed successfully: {result}")
+                latency_ms = result.get('latency_ms')
+                if latency_ms is not None:
+                    self.aws.publish_metrics([
+                        {'name': 'OrderLatencyMs', 'value': latency_ms, 'unit': 'Milliseconds'}
+                    ])
                 return result
             else:
                 logger.error(f"Trade execution failed: {result}")
@@ -252,8 +258,23 @@ class TradingBot:
             logger.error(f"Error executing trade: {e}", exc_info=True)
             return None
     
+    @staticmethod
+    def _compute_risk_metrics(daily_pnl: list) -> Dict[str, float]:
+        """Return annualised Sharpe ratio and 95% historical VaR from daily P&L list."""
+        if len(daily_pnl) < 5:
+            return {}
+        n = len(daily_pnl)
+        mean = sum(daily_pnl) / n
+        variance = sum((x - mean) ** 2 for x in daily_pnl) / n
+        std = variance ** 0.5
+        sharpe = (mean / std) * (252 ** 0.5) if std > 0 else 0.0
+        sorted_pnl = sorted(daily_pnl)
+        var_idx = max(0, int(n * 0.05) - 1)
+        var_95 = sorted_pnl[var_idx]  # negative value = loss
+        return {'sharpe': sharpe, 'var_95': var_95}
+
     def update_metrics(self, account_info: Dict[str, Any]):
-        """Update CloudWatch metrics"""
+        """Publish CloudWatch metrics; recomputes Sharpe/VaR once per hour."""
         try:
             if account_info is None:
                 logger.error("Cannot update metrics: account_info is None")
@@ -263,12 +284,32 @@ class TradingBot:
                 self.daily_start_equity = account_info.get('equity')
 
             daily_pnl = account_info.get('equity', 0) - (self.daily_start_equity or 0)
-            self.aws.publish_metrics([
-                {'name': 'AccountBalance',  'value': account_info['balance']},
-                {'name': 'AccountEquity',   'value': account_info['equity']},
-                {'name': 'TradesExecuted',  'value': self.trades_today},
-                {'name': 'DailyPnL',        'value': daily_pnl},
-            ])
+            metrics = [
+                {'name': 'AccountBalance', 'value': account_info['balance']},
+                {'name': 'AccountEquity',  'value': account_info['equity']},
+                {'name': 'TradesExecuted', 'value': self.trades_today},
+                {'name': 'DailyPnL',       'value': daily_pnl},
+            ]
+
+            now = time.time()
+            if now - self._last_risk_metrics_time >= 3600:
+                pnl_history = self.db.get_daily_pnl_history(days=30)
+                risk = self._compute_risk_metrics(pnl_history)
+                if risk:
+                    metrics.append({'name': 'SharpeRatio', 'value': risk['sharpe']})
+                    metrics.append({'name': 'DailyVaR95',  'value': risk['var_95']})
+                self._last_risk_metrics_time = now
+
+            self.aws.publish_metrics(metrics)
+
+            self.db.log_account_metrics({
+                'balance':      account_info['balance'],
+                'equity':       account_info['equity'],
+                'profit':       account_info.get('profit', 0),
+                'margin':       account_info.get('margin', 0),
+                'margin_free':  account_info.get('margin_free', 0),
+                'margin_level': account_info.get('margin_level', 0),
+            })
 
         except Exception as e:
             logger.error(f"Error updating metrics: {e}")
